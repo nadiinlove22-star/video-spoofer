@@ -6,151 +6,129 @@ import tempfile
 
 # Konfigurasi Halaman Utama
 st.set_page_config(
-    page_title="Video Metadata Spoofer & Forensic",
+    page_title="Video Metadata Suite",
     page_icon="🎬",
     layout="wide"
 )
 
-# Custom Styling CSS agar UI tidak kosongan dan lebih menarik
+# Custom Styling CSS agar UI menarik dan tidak kosongan
 st.markdown("""
     <style>
     .main-header {
-        font-size: 2.2rem;
+        font-size: 2rem;
         color: #FF4B4B;
         font-weight: 700;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.1rem;
     }
     .sub-header {
-        font-size: 1.1rem;
+        font-size: 1rem;
         color: #6c757d;
-        margin-bottom: 2rem;
-    }
-    .stAlert {
-        border-radius: 10px;
+        margin-bottom: 1.5rem;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Header Aplikasi
-st.markdown('<div class="main-header">🎬 Video Metadata Spoofer & Forensic Suite</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Suntik metadata super detail ala iPhone secara presisi dan analisis keaslian video berbasis data objektif.</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🎬 Video Metadata & Forensic Suite</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Upload satu kali: Analisis keaslian video secara objektif dan langsung suntik metadata ala iPhone jika diperlukan.</div>', unsafe_allow_html=True)
 
-# Sidebar untuk Pengaturan Metadata iPhone
-st.sidebar.header("⚙️ Konfigurasi Metadata iPhone")
-st.sidebar.info("Atur parameter perangkat di bawah ini untuk disuntikkan ke dalam video target.")
-
+# Sidebar untuk Pengaturan Target Metadata iPhone
+st.sidebar.header("⚙️ Pengaturan Spoofer iPhone")
 device_make = st.sidebar.text_input("Device Make", "Apple")
 device_model = st.sidebar.text_input("Device Model", "iPhone 11")
 software_ver = st.sidebar.text_input("Software / iOS Version", "18.6.2 (Build 22G90)")
 creation_time = st.sidebar.text_input("Creation Time (UTC)", "2026-09-22T06:00:00Z")
 
-# Tab Utama
-tab1, tab2 = st.tabs(["🚀 Suntik Metadata (Spoofer)", "🔍 Analisis Forensik Video"])
+# Area Unggah Utama (Hanya 1 kali upload)
+uploaded_file = st.file_uploader("📂 Pilih atau Seret File Video (.mp4 / .mov)", type=["mp4", "mov", "mkv", "avi"])
 
-with tab1:
-    st.subheader("Penyuntikan Metadata Video")
-    st.write("Unggah video target, lalu jalankan proses penyuntikan metadata perangkat secara instan.")
+if uploaded_file is not None:
+    st.video(uploaded_file)
+    st.markdown("---")
     
-    uploaded_file_spoof = st.file_uploader("Pilih file video (.mp4 / .mov)", type=["mp4", "mov"], key="spoof")
+    # Simpan ke file sementara untuk diproses ffprobe & ffmpeg
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    tfile.write(uploaded_file.read())
+    tfile.close()
     
-    if uploaded_file_spoof is not None:
-        st.video(uploaded_file_spoof)
+    # 1. Otomatis Jalankan Analisis Forensik di awal
+    st.subheader("🔍 Hasil Analisis & Keaslian Video")
+    
+    cmd_probe = [
+        "ffprobe", "-v", "quiet", "-print_format", "json",
+        "-show_format", "-show_streams", tfile.name
+    ]
+    
+    try:
+        result = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
         
-        if st.button("Jalankan Penyuntikan Metadata", type="primary"):
-            with st.spinner("Sedang memproses metadata video..."):
-                # Simpan file sementara
-                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                tfile.write(uploaded_file_spoof.read())
-                tfile.close()
-                
-                output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                output_file.close()
-                
-                # Perintah FFmpeg untuk menyuntikkan metadata
-                cmd = [
-                    "ffmpeg", "-y", "-i", tfile.name,
-                    "-metadata", f"com.apple.quicktime.make={device_make}",
-                    "-metadata", f"com.apple.quicktime.model={device_model}",
-                    "-metadata", f"com.apple.quicktime.software={software_ver}",
-                    "-metadata", f"com.apple.quicktime.creationdate={creation_time}",
-                    "-metadata", f"encoder={software_ver}",
-                    "-codec", "copy", output_file.name
-                ]
-                
-                try:
-                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    st.success("Metadata berhasil disuntikkan dengan sukses!")
-                    
-                    with open(output_file.name, "rb") as f:
-                        st.download_button(
-                            label="📥 Unduh Video Hasil Spoofer",
-                            data=f,
-                            file_name="video_spoofed_iphone.mp4",
-                            mime="video/mp4"
-                        )
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan saat memproses video: {e}")
-                finally:
-                    # Bersihkan file temp
-                    if os.path.exists(tfile.name): os.unlink(tfile.name)
+        format_data = data.get("format", {})
+        format_tags = format_data.get("tags", {})
+        
+        make = format_tags.get("com.apple.quicktime.make", format_tags.get("make", "Tidak ada data"))
+        model = format_tags.get("com.apple.quicktime.model", format_tags.get("model", "Tidak ada data"))
+        encoder = format_tags.get("com.apple.quicktime.software", format_tags.get("encoder", format_tags.get("HANDLER_NAME", "Tidak diketahui")))
+        
+        # Tampilan Metrik Data Asli
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Pabrikan (Make)", make)
+        col2.metric("Model Perangkat", model)
+        col3.metric("Encoder / Software", encoder)
+        
+        # Kesimpulan Probabilitas Objektif
+        make_lower = make.lower()
+        model_lower = model.lower()
+        encoder_lower = encoder.lower()
+        
+        if "apple" in make_lower or "iphone" in model_lower:
+            st.info("🟢 **Probabilitas Tinggi:** Rekaman asli berasal dari perangkat ekosistem iOS (Apple).")
+        elif "tiktok" in encoder_lower or "instagram" in encoder_lower or "fb" in encoder_lower:
+            st.warning("🟡 **Probabilitas Sedang:** Terdeteksi string platform media sosial pada bagian encoder/tags.")
+        elif make == "Tidak ada data" and model == "Tidak ada data":
+            st.info("⚪ **Data Kosong:** Metadata pabrikan tidak ditemukan. Kemungkinan besar video suntingan editor PC, unduhan web bersih, atau file yang dibersihkan metadatanya. *(Tidak cukup bukti untuk melabeli sebagai AI).*")
+        else:
+            st.info("🔵 **Netral:** Format standar / Tidak ditemukan tanda tangan khusus perangkat atau platform tertentu.")
+            
+    except Exception as e:
+        st.error(f"Gagal membaca struktur file: {e}")
 
-with tab2:
-    st.subheader("Analisis Asal-Usul & Keaslian Video (Data-Driven)")
-    st.write("Periksa struktur metadata file secara objektif tanpa asumsi atau tebakan liar.")
+    st.markdown("---")
     
-    uploaded_file_forensic = st.file_uploader("Pilih file video untuk dianalisis", type=["mp4", "mov", "mkv", "avi"], key="forensic")
+    # 2. Bagian Aksi Penyuntikan Metadata (Tanpa Upload Ulang)
+    st.subheader("🚀 Tindakan Penyuntikan Metadata (Spoofing)")
+    st.write("Jika ingin mengubah atau menyamarkan metadata video di atas menjadi ala iPhone, klik tombol di bawah ini.")
     
-    if uploaded_file_forensic is not None:
-        st.video(uploaded_file_forensic)
-        
-        if st.button("Mulai Analisis Forensik", type="primary"):
-            with st.spinner("Mengekstrak struktur stream dan format tags..."):
-                tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                tfile.write(uploaded_file_forensic.read())
-                tfile.close()
+    if st.button("Jalankan Suntik Metadata Sekarang", type="primary"):
+        with st.spinner("Sedang memproses penyuntikan metadata..."):
+            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            output_file.close()
+            
+            cmd_spoof = [
+                "ffmpeg", "-y", "-i", tfile.name,
+                "-metadata", f"com.apple.quicktime.make={device_make}",
+                "-metadata", f"com.apple.quicktime.model={device_model}",
+                "-metadata", f"com.apple.quicktime.software={software_ver}",
+                "-metadata", f"com.apple.quicktime.creationdate={creation_time}",
+                "-metadata", f"encoder={software_ver}",
+                "-codec", "copy", output_file.name
+            ]
+            
+            try:
+                subprocess.run(cmd_spoof, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                st.success("Metadata berhasil disuntikkan!")
                 
-                cmd_probe = [
-                    "ffprobe", "-v", "quiet", "-print_format", "json",
-                    "-show_format", "-show_streams", tfile.name
-                ]
+                with open(output_file.name, "rb") as f:
+                    st.download_button(
+                        label="📥 Unduh Video Hasil Spoofer",
+                        data=f,
+                        file_name="video_spoofed_iphone.mp4",
+                        mime="video/mp4"
+                    )
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat memproses video: {e}")
                 
-                try:
-                    result = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
-                    data = json.loads(result.stdout)
-                    
-                    format_data = data.get("format", {})
-                    format_tags = format_data.get("tags", {})
-                    
-                    # Ekstraksi informasi penting
-                    make = format_tags.get("com.apple.quicktime.make", format_tags.get("make", "Tidak ada data"))
-                    model = format_tags.get("com.apple.quicktime.model", format_tags.get("model", "Tidak ada data"))
-                    encoder = format_tags.get("com.apple.quicktime.software", format_tags.get("encoder", format_tags.get("HANDLER_NAME", "Tidak diketahui")))
-                    
-                    # Tampilan Metrik Hasil
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Pabrikan (Make)", make)
-                    col2.metric("Model Perangkat", model)
-                    col3.metric("Encoder / Software", encoder)
-                    
-                    st.markdown("---")
-                    st.markdown("### 📋 Kesimpulan Analisis Probabilitas Objektif")
-                    
-                    # Logika Probabilitas Jujur Berbasis Data
-                    make_lower = make.lower()
-                    model_lower = model.lower()
-                    encoder_lower = encoder.lower()
-                    
-                    if "apple" in make_lower or "iphone" in model_lower:
-                        st.info("🟢 **Probabilitas Tinggi:** Rekaman asli berasal dari perangkat ekosistem iOS (Apple).")
-                    elif "tiktok" in encoder_lower or "instagram" in encoder_lower or "fb" in encoder_lower:
-                        st.warning("🟡 **Probabilitas Sedang:** Terdeteksi string platform media sosial pada bagian encoder/tags.")
-                    elif make == "Tidak ada data" and model == "Tidak ada data":
-                        st.info("⚪ **Data Kosong:** Metadata pabrikan tidak ditemukan. Kemungkinan besar video suntingan editor PC, unduhan web bersih, atau file yang telah dibersihkan metadatanya. *(Tidak cukup bukti untuk melabeli sebagai AI).*")
-                    else:
-                        st.info("🔵 **Netral:** Format standar / Tidak ditemukan tanda tangan khusus perangkat atau platform tertentu.")
-                        
-                except Exception as e:
-                    st.error(f"Gagal membaca struktur file: {e}")
-                finally:
-                    if os.path.exists(tfile.name): os.unlink(tfile.name)
-                        
+    # Bersihkan file temp utama
+    if os.path.exists(tfile.name): 
+        os.unlink(tfile.name)
+    
