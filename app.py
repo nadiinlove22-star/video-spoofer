@@ -76,19 +76,26 @@ if uploaded_file is not None:
         col2.metric("Model Perangkat", model)
         col3.metric("Encoder / Software", encoder)
         
-        # Kesimpulan Probabilitas Objektif
+        st.markdown("---")
+        st.markdown("### 📋 Kesimpulan Analisis Probabilitas Objektif")
+        
+        # Logika Deteksi Cerdas Berbasis Data Encoder & Metadata (Upgrade)
         make_lower = make.lower()
         model_lower = model.lower()
         encoder_lower = encoder.lower()
         
         if "apple" in make_lower or "iphone" in model_lower:
             st.info("🟢 **Probabilitas Tinggi:** Rekaman asli berasal dari perangkat ekosistem iOS (Apple).")
+        elif "google" in encoder_lower:
+            st.error("🤖 **Indikasi Kuat Buatan AI / Cloud:** Terdeteksi tanda tangan 'Google' pada encoder/software (umum pada video hasil generasi AI atau layanan cloud Google).")
+        elif "openai" in encoder_lower or "runway" in encoder_lower or "kling" in encoder_lower:
+            st.error("🤖 **Indikasi Kuat Buatan AI:** Terdeteksi tanda tangan generator video AI pada metadata file.")
         elif "tiktok" in encoder_lower or "instagram" in encoder_lower or "fb" in encoder_lower:
             st.warning("🟡 **Probabilitas Sedang:** Terdeteksi string platform media sosial pada bagian encoder/tags.")
-        elif make == "Tidak ada data" and model == "Tidak ada data":
-            st.info("⚪ **Data Kosong:** Metadata pabrikan tidak ditemukan. Kemungkinan besar video suntingan editor PC, unduhan web bersih, atau file yang dibersihkan metadatanya. *(Tidak cukup bukti untuk melabeli sebagai AI).*")
+        elif make == "Tidak ada data" and model == "Tidak ada data" and encoder == "Tidak diketahui":
+            st.info("⚪ **Data Kosong:** Metadata pabrikan tidak ditemukan sama sekali.")
         else:
-            st.info("🔵 **Netral:** Format standar / Tidak ditemukan tanda tangan khusus perangkat atau platform tertentu.")
+            st.warning(f"🔍 **Terdeteksi Encoder Lain ({encoder}):** File diproses menggunakan software/encoder non-standar perangkat seluler.")
             
     except Exception as e:
         st.error(f"Gagal membaca struktur file: {e}")
@@ -131,4 +138,4 @@ if uploaded_file is not None:
     # Bersihkan file temp utama
     if os.path.exists(tfile.name): 
         os.unlink(tfile.name)
-    
+        
