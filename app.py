@@ -51,7 +51,7 @@ if uploaded_file is not None:
     tfile.write(uploaded_file.read())
     tfile.close()
     
-    # 1. Otomatis Jalankan Analisis Forensik di awal
+    # 1. Otomatis Jalankan Analisis Forensik Mendalam
     st.subheader("🔍 Hasil Analisis & Keaslian Video")
     
     cmd_probe = [
@@ -64,38 +64,54 @@ if uploaded_file is not None:
         data = json.loads(result.stdout)
         
         format_data = data.get("format", {})
-        format_tags = format_data.get("tags", {})
+        format_tags = format_data.get("format_tags", format_data.get("tags", {}))
+        streams = data.get("streams", [])
         
-        make = format_tags.get("com.apple.quicktime.make", format_tags.get("make", "Tidak ada data"))
-        model = format_tags.get("com.apple.quicktime.model", format_tags.get("model", "Tidak ada data"))
-        encoder = format_tags.get("com.apple.quicktime.software", format_tags.get("encoder", format_tags.get("HANDLER_NAME", "Tidak diketahui")))
+        # Fungsi pembantu untuk mencari tag dari berbagai kemungkinan lokasi
+        def find_tag(keys):
+            # Cek di format tags utama
+            for k in keys:
+                if k in format_tags:
+                    return format_tags[k]
+            # Cek di setiap stream tags (video/audio stream)
+            for stream in streams:
+                st_tags = stream.get("tags", {})
+                for k in keys:
+                    if k in st_tags:
+                        return st_tags[k]
+            return "Tidak ada data"
+
+        # Pencarian multi-lapis untuk akurasi tinggi
+        make = find_tag(["com.apple.quicktime.make", "make", "manufacturer", "brand"])
+        model = find_tag(["com.apple.quicktime.model", "model", "device_model"])
+        encoder = find_tag(["com.apple.quicktime.software", "encoder", "HANDLER_NAME", "handler_name", "software", "creation_tool"])
         
         # Tampilan Metrik Data Asli
         col1, col2, col3 = st.columns(3)
-        col1.metric("Pabrikan (Make)", make)
-        col2.metric("Model Perangkat", model)
-        col3.metric("Encoder / Software", encoder)
+        col1.metric("Pabrikan (Make)", str(make))
+        col2.metric("Model Perangkat", str(model))
+        col3.metric("Encoder / Software", str(encoder))
         
         st.markdown("---")
         st.markdown("### 📋 Kesimpulan Analisis Probabilitas Objektif")
         
-        # Logika Deteksi Cerdas Berbasis Data Encoder & Metadata (Upgrade)
-        make_lower = make.lower()
-        model_lower = model.lower()
-        encoder_lower = encoder.lower()
+        # Logika Deteksi Cerdas Berbasis Data Mendalam
+        make_lower = str(make).lower()
+        model_lower = str(model).lower()
+        encoder_lower = str(encoder).lower()
         
-        if "apple" in make_lower or "iphone" in model_lower:
-            st.info("🟢 **Probabilitas Tinggi:** Rekaman asli berasal dari perangkat ekosistem iOS (Apple).")
-        elif "google" in encoder_lower:
-            st.error("🤖 **Indikasi Kuat Buatan AI / Cloud:** Terdeteksi tanda tangan 'Google' pada encoder/software (umum pada video hasil generasi AI atau layanan cloud Google).")
-        elif "openai" in encoder_lower or "runway" in encoder_lower or "kling" in encoder_lower:
+        if "apple" in make_lower or "iphone" in model_lower or "ios" in encoder_lower:
+            st.info("🟢 **Probabilitas Tinggi:** Rekaman asli berasal dari perangkat atau ekosistem iOS (Apple).")
+        elif "google" in encoder_lower or "veo" in encoder_lower or "imagen" in encoder_lower:
+            st.error("🤖 **Indikasi Kuat Buatan AI / Cloud:** Terdeteksi tanda tangan 'Google' atau layanan cloud AI pada metadata file.")
+        elif "openai" in encoder_lower or "runway" in encoder_lower or "kling" in encoder_lower or "sora" in encoder_lower:
             st.error("🤖 **Indikasi Kuat Buatan AI:** Terdeteksi tanda tangan generator video AI pada metadata file.")
-        elif "tiktok" in encoder_lower or "instagram" in encoder_lower or "fb" in encoder_lower:
-            st.warning("🟡 **Probabilitas Sedang:** Terdeteksi string platform media sosial pada bagian encoder/tags.")
-        elif make == "Tidak ada data" and model == "Tidak ada data" and encoder == "Tidak diketahui":
-            st.info("⚪ **Data Kosong:** Metadata pabrikan tidak ditemukan sama sekali.")
+        elif "tiktok" in encoder_lower or "instagram" in encoder_lower or "facebook" in encoder_lower or "threads" in encoder_lower:
+            st.warning("🟡 **Probabilitas Sedang:** Terdeteksi jejak atau string platform media sosial pada bagian encoder/tags.")
+        elif make == "Tidak ada data" and model == "Tidak ada data" and encoder == "Tidak ada data":
+            st.info("⚪ **Data Bersih / Kosong:** Tidak ditemukan tag metadata pabrikan atau encoder. Kemungkinan besar video unduhan bersih, hasil render editor video PC (Premiere/CapCut), atau file yang metadatanya telah dihapus.")
         else:
-            st.warning(f"🔍 **Terdeteksi Encoder Lain ({encoder}):** File diproses menggunakan software/encoder non-standar perangkat seluler.")
+            st.warning(f"🔍 **Terdeteksi Software/Encoder Lain:** [{encoder}] - File diproses menggunakan software atau perangkat non-standar.")
             
     except Exception as e:
         st.error(f"Gagal membaca struktur file: {e}")
