@@ -2,6 +2,10 @@
 title = Video Metadata Spoofer
 package.name = videospoofer
 package.domain = org.spoofer
+
+# Tentukan folder sumber kode (titik berarti di folder utama ini)
+source.dir = .
+
 source.include_exts = py,png,jpg,kv,atlas
 version = 1.0
 requirements = python3,kivy,ffmpeg
