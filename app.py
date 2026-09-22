@@ -6,13 +6,12 @@ import tempfile
 
 # Konfigurasi Halaman Utama
 st.set_page_config(
-    page_title="Video Metadata & Forensic Suite Pro",
+    page_title="Video Metadata & Forensic Forensic Suite Pro",
     page_icon="🎬",
     layout="wide"
 )
 
-# File lokal untuk menyimpan preset agar permanen
-PRESET_FILE = "metadata_presets.json"
+PRESET_FILE = "metadata_presets_lossless.json"
 
 def load_presets():
     if os.path.exists(PRESET_FILE):
@@ -21,15 +20,7 @@ def load_presets():
                 return json.load(f)
         except:
             pass
-    return {
-        "iPhone 11 (iOS 18.6)": {
-            "make": "Apple",
-            "model": "iPhone 11",
-            "software": "18.6.2",
-            "creation_date": "2026-02-28T04:54:17Z",
-            "encoder": "Lavf60.3.100"
-        }
-    }
+    return {}
 
 def save_presets(presets):
     with open(PRESET_FILE, "w") as f:
@@ -39,273 +30,156 @@ if "preset_list" not in st.session_state:
     st.session_state.preset_list = load_presets()
 
 # Header Aplikasi
-st.markdown("<h2>🎬 Video Metadata & Forensic Suite Pro</h2>", unsafe_allow_html=True)
-st.markdown("<p style='color: #adb5bd;'>Analisis forensik, salin/simpan template metadata permanen, dan verifikasi hasil suntikan.</p>", unsafe_allow_html=True)
+st.markdown("<h2>🎬 Video Forensic & iPhone Re-Encoder Suite</h2>", unsafe_allow_html=True)
+st.markdown("<p style='color: #adb5bd;'>Ekstraksi metadata total & Transcoding tingkat lanjut untuk replika forensik identik ala iPhone.</p>", unsafe_allow_html=True)
 
-# --- SIDEBAR: MANAJEMEN LIST PRESET ---
-st.sidebar.header("📋 Manajemen List Preset")
+# --- UPLOAD VIDEO SUMBER (TEMPLATE) ---
+st.subheader("1️⃣ Ekstraksi Total Metadata dari Video Sumber (iPhone Asli)")
+uploaded_source = st.file_uploader("📂 Unggah Video Sumber (Template iPhone Asli)", type=["mp4", "mov", "mkv", "avi"], key="source_uploader")
 
-preset_names = list(st.session_state.preset_list.keys())
-selected_preset_sidebar = st.sidebar.selectbox("Pilih Preset untuk Diedit", ["-- Buat Baru / Manual --"] + preset_names, key="sb_select")
-
-with st.sidebar.expander("🛠️ Edit / Hapus Preset Terpilih", expanded=False):
-    if selected_preset_sidebar != "-- Buat Baru / Manual --":
-        curr_data = st.session_state.preset_list[selected_preset_sidebar]
-        p_name_input = st.text_input("Nama Preset", value=selected_preset_sidebar, key="edit_p_name")
-        p_make = st.text_input("Make", value=curr_data.get("make", "Apple"), key="edit_make")
-        p_model = st.text_input("Model", value=curr_data.get("model", "iPhone"), key="edit_model")
-        p_sw = st.text_input("Software", value=curr_data.get("software", "18.0"), key="edit_sw")
-        p_date = st.text_input("Creation Date", value=curr_data.get("creation_date", ""), key="edit_date")
-        p_enc = st.text_input("Encoder", value=curr_data.get("encoder", ""), key="edit_enc")
-        
-        col_s1, col_s2 = st.columns(2)
-        if col_s1.button("💾 Update Preset"):
-            if p_name_input != selected_preset_sidebar:
-                del st.session_state.preset_list[selected_preset_sidebar]
-            st.session_state.preset_list[p_name_input] = {
-                "make": p_make, "model": p_model, "software": p_sw, "creation_date": p_date, "encoder": p_enc
-            }
-            save_presets(st.session_state.preset_list)
-            st.sidebar.success("Berhasil diupdate!")
-            st.rerun()
-            
-        if col_s2.button("🗑️ Hapus Preset", type="primary"):
-            del st.session_state.preset_list[selected_preset_sidebar]
-            save_presets(st.session_state.preset_list)
-            st.sidebar.warning("Berhasil dihapus!")
-            st.rerun()
-    else:
-        new_p_name = st.text_input("Nama Preset Baru", "Preset Baru 1", key="new_p_name")
-        new_make = st.text_input("Make", "Apple", key="new_make")
-        new_model = st.text_input("Model", "iPhone 11", key="new_model")
-        new_sw = st.text_input("Software", "18.6.2", key="new_sw")
-        new_date = st.text_input("Creation Date", "2026-02-28T04:54:17Z", key="new_date")
-        new_enc = st.text_input("Encoder", "Lavf60.3.100", key="new_enc")
-        
-        if st.button("➕ Tambah ke List"):
-            st.session_state.preset_list[new_p_name] = {
-                "make": new_make, "model": new_model, "software": new_sw, "creation_date": new_date, "encoder": new_enc
-            }
-            save_presets(st.session_state.preset_list)
-            st.sidebar.success("Preset baru ditambahkan!")
-            st.rerun()
-
-
-# --- AREA UTAMA APLIKASI ---
-uploaded_file = st.file_uploader("📂 Pilih atau Seret File Video (.mp4 / .mov / .mkv)", type=["mp4", "mov", "mkv", "avi"])
-
-if uploaded_file is not None:
-    col_vid1, col_vid2 = st.columns([1, 1])
-    with col_vid1:
-        st.video(uploaded_file)
-    
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-    tfile.write(uploaded_file.read())
-    tfile.close()
+if uploaded_source is not None:
+    src_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    src_file.write(uploaded_source.read())
+    src_file.close()
     
     cmd_probe = [
         "ffprobe", "-v", "quiet", "-print_format", "json",
-        "-show_format", "-show_streams", tfile.name
+        "-show_format", "-show_streams", src_file.name
     ]
     
     try:
-        result = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
-        data = json.loads(result.stdout)
+        res = subprocess.run(cmd_probe, capture_output=True, text=True, check=True)
+        probe_data = json.loads(res.stdout)
         
-        format_data = data.get("format", {})
-        format_tags = format_data.get("tags", {})
-        streams = data.get("streams", [])
+        format_tags = probe_data.get("format", {}).get("tags", {})
+        streams_data = probe_data.get("streams", [])
         
-        video_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
-        audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), {})
-        
-        all_tags = format_tags.copy()
-        for s in streams:
-            all_tags.update(s.get("tags", {}))
-            
-        def get_tag(possible_keys):
-            for k in possible_keys:
-                for actual_k, val in all_tags.items():
-                    if k.lower() in actual_k.lower():
-                        return str(val)
-            return "N/A"
+        master_metadata = format_tags.copy()
+        for idx, s in enumerate(streams_data):
+            s_tags = s.get("tags", {})
+            for k, v in s_tags.items():
+                master_metadata[f"stream_{idx}_{k}"] = v
 
-        extracted_make = get_tag(["make", "manufacturer", "brand", "major_brand"])
-        extracted_model = get_tag(["model", "device_model"])
-        extracted_software = get_tag(["software", "com.apple.quicktime.software"])
-        extracted_encoder = get_tag(["encoder", "handler_name", "creation_tool"])
-        extracted_creation_date = get_tag(["creation_time", "date", "com.apple.quicktime.creationdate"])
+        st.success(f"Berhasil mengekstrak **{len(master_metadata)} atribut metadata** secara lengkap!")
         
-        with col_vid2:
-            st.markdown("### 📊 Ringkasan Identitas File Asli")
-            st.write(f"**Pabrikan (Make):** {extracted_make}")
-            st.write(f"**Model Perangkat:** {extracted_model}")
-            st.write(f"**Software / iOS:** {extracted_software}")
-            st.write(f"**Encoder / Tool:** {extracted_encoder}")
-            st.write(f"**Creation Date:** {extracted_creation_date}")
+        with st.expander("🔍 Lihat Detail Raw Metadata Master (JSON)"):
+            st.json(master_metadata)
             
-            st.markdown("---")
-            st.markdown("#### 📋 Salin & Simpan Metadata Ini")
-            save_name_input = st.text_input("Beri Nama Preset List", value=f"Preset_{extracted_model if extracted_model != 'N/A' else 'Custom'}", key="save_preset_input")
-            
-            if st.button("📥 Simpan ke List Preset Sekarang", type="secondary"):
-                st.session_state.preset_list[save_name_input] = {
-                    "make": extracted_make if extracted_make != "N/A" else "Apple",
-                    "model": extracted_model if extracted_model != "N/A" else "iPhone",
-                    "software": extracted_software if extracted_software != "N/A" else "18.0",
-                    "creation_date": extracted_creation_date if extracted_creation_date != "N/A" else "2026-02-28T04:54:17Z",
-                    "encoder": extracted_encoder if extracted_encoder != "N/A" else "Lavf60.3.100"
-                }
-                save_presets(st.session_state.preset_list)
-                st.success(f"Berhasil disimpan dengan nama **{save_name_input}**!")
-                st.rerun()
-
-        st.markdown("---")
+        st.markdown("#### 💾 Simpan Profil Master Ini ke List Preset")
+        preset_name_input = st.text_input("Nama Preset Master", value="iPhone_Identical_Profile")
         
-        # Tabs Detail
-        tab1, tab2, tab3 = st.tabs(["📱 Parameter File", "🎞️ Spesifikasi Media", "📜 Raw Metadata (JSON)"])
-        with tab1:
-            st.write(f"**Format:** {format_data.get('format_long_name', 'N/A')}")
-            st.write(f"**Durasi:** {float(format_data.get('duration', 0)):.2f} detik")
-            st.write(f"**Ukuran:** {int(format_data.get('size', 0)) / (1024*1024):.2f} MB")
-        with tab2:
-            st.write(f"**Video Codec:** {video_stream.get('codec_name', 'N/A').upper()}")
-            st.write(f"**Resolusi:** {video_stream.get('width', 'N/A')} x {video_stream.get('height', 'N/A')} px")
-            st.write(f"**Audio Codec:** {audio_stream.get('codec_name', 'N/A').upper() if audio_stream else 'Tidak ada'}")
-        with tab3:
-            st.json(all_tags)
+        if st.button("📥 Simpan Profil Ini"):
+            st.session_state.preset_list[preset_name_input] = {
+                "format_tags": format_tags,
+                "streams_tags": [s.get("tags", {}) for s in streams_data],
+                "raw_dump": master_metadata
+            }
+            save_presets(st.session_state.preset_list)
+            st.success(f"Profil '{preset_name_input}' berhasil disimpan!")
+            st.rerun()
+            
+        if os.path.exists(src_file.name):
+            os.unlink(src_file.name)
             
     except Exception as e:
-        st.error(f"Gagal membaca file: {e}")
+        st.error(f"Gagal memproses ekstraksi: {e}")
 
-    st.markdown("---")
-    
-    # --- BAGIAN EKSEKUSI SUNTIK DENGAN PILIHAN PRESET DEFAULT & OPSI HAPUS ---
-    st.subheader("🚀 Eksekusi & Analisis Ulang Metadata (Paste & Verify Engine)")
-    st.write("Pilih preset target, jalankan suntikan, lalu verifikasi detail metadata terbarunya.")
-    
-    current_preset_names = list(st.session_state.preset_list.keys())
-    
-    # Otomatis jadikan iPhone 11 sebagai default index pertama jika ada di list
-    default_index = 0
-    for idx, p_name in enumerate(current_preset_names):
-        if "iPhone 11" in p_name:
-            default_index = idx
-            break
-            
-    chosen_execution_preset = st.selectbox(
-        "🎯 Pilih Preset Target untuk Disuntikkan (Default: iPhone 11)", 
-        current_preset_names, 
-        index=default_index, 
-        key="exec_preset_choice"
-    )
-    
-    # Tombol instan untuk menghapus preset yang sedang dipilih dari list
-    col_del_p1, col_del_p2 = st.columns([2, 5])
-    with col_del_p1:
-        if len(current_preset_names) > 1:
-            if st.button("🗑️ Hapus Preset Ini dari List"):
-                del st.session_state.preset_list[chosen_execution_preset]
-                save_presets(st.session_state.preset_list)
-                st.warning(f"Preset '{chosen_execution_preset}' berhasil dihapus!")
-                st.rerun()
-        else:
-            st.caption("Minimal harus ada 1 preset tersimpan.")
-            
-    selected_data = st.session_state.preset_list[chosen_execution_preset]
-    
-    with st.expander(f"👁️ Lihat Detail Data yang Akan Disuntikkan dari Preset: **{chosen_execution_preset}**"):
-        st.json(selected_data)
-    
-    if "spoofed_file_path" not in st.session_state:
-        st.session_state.spoofed_file_path = None
-    if "verified_metadata" not in st.session_state:
-        st.session_state.verified_metadata = None
+st.markdown("---")
 
-    if st.button(f"Jalankan Suntik & Analisis Ulang Menggunakan Preset '{chosen_execution_preset}'", type="primary"):
-        with st.spinner("Memproses penyuntikan dan menganalisis ulang file baru..."):
-            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            output_file.close()
-            
-            cmd_spoof = [
-                "ffmpeg", "-y", "-i", tfile.name,
-                "-metadata", f"com.apple.quicktime.make={selected_data['make']}",
-                "-metadata", f"com.apple.quicktime.model={selected_data['model']}",
-                "-metadata", f"com.apple.quicktime.software={selected_data['software']}",
-                "-metadata", f"com.apple.quicktime.creationdate={selected_data['creation_date']}",
-                "-metadata", f"encoder={selected_data['encoder']}",
-                "-metadata", f"handler_name=Core Media Video",
-                "-codec", "copy", output_file.name
+# --- UPLOAD VIDEO TARGET & RE-ENCODE IDENTIK ---
+st.subheader("2️⃣ Re-Encode & Suntik Identik ke Video Target")
+st.write("Video target akan di-transcode ulang agar struktur stream, codec, dan metadatanya menyerupai karakteristik rekam hardware iPhone.")
+
+uploaded_target = st.file_uploader("📂 Unggah Video Target yang Mau Dipalsukan", type=["mp4", "mov", "mkv", "avi"], key="target_uploader")
+
+if uploaded_target is not None:
+    current_presets = list(st.session_state.preset_list.keys())
+    
+    if not current_presets:
+        st.warning("⚠️ Belum ada profil master. Silakan unggah video sumber iPhone asli di langkah 1 terlebih dahulu.")
+    else:
+        chosen_profile = st.selectbox("🎯 Pilih Profil Master Rujukan", current_presets)
+        
+        # Pilihan mode rendering
+        render_mode = st.radio(
+            "⚙️ Pilih Mode Pemrosesan Target:",
+            [
+                "Identik Forensik (Re-Encode H.264 High Profile ala Apple - Menghilangkan jejak editor/PC)",
+                "Salin Cepat (Hanya Suntik Tag / Tanpa Re-encode - Cepat tapi jejak stream asli tetap tertinggal)"
             ]
-            
-            try:
-                subprocess.run(cmd_spoof, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                st.session_state.spoofed_file_path = output_file.name
-                
-                # RE-PROBE: Analisis ulang file hasil suntikan secara otomatis
-                cmd_reprobe = [
-                    "ffprobe", "-v", "quiet", "-print_format", "json",
-                    "-show_format", "-show_streams", output_file.name
-                ]
-                reprobe_res = subprocess.run(cmd_reprobe, capture_output=True, text=True, check=True)
-                reprobe_data = json.loads(reprobe_res.stdout)
-                
-                r_format_tags = reprobe_data.get("format", {}).get("tags", {})
-                r_streams = reprobe_data.get("streams", [])
-                r_all_tags = r_format_tags.copy()
-                for s in r_streams:
-                    r_all_tags.update(s.get("tags", {}))
-                
-                st.session_state.verified_metadata = r_all_tags
-                st.success("Suntikan berhasil dan file telah dianalisis ulang!")
-            except Exception as e:
-                st.error(f"Gagal memproses ffmpeg / ffprobe: {e}")
-
-    # Tampilkan Hasil Analisis Ulang & Keputusan Unduh
-    if st.session_state.spoofed_file_path and st.session_state.verified_metadata:
-        st.markdown("---")
-        st.markdown("### 🔍 Hasil Verifikasi Metadata Terbaru (Setelah Disuntik)")
-        st.info("Silakan periksa detail di bawah ini. Pastikan pengaturan sudah sesuai sebelum Anda memutuskan untuk mengunduhnya.")
+        )
         
-        v_tags = st.session_state.verified_metadata
-        def get_v_tag(keys):
-            for k in keys:
-                for ak, val in v_tags.items():
-                    if k.lower() in ak.lower():
-                        return str(val)
-            return "N/A"
-            
-        col_v1, col_v2 = st.columns(2)
-        with col_v1:
-            st.write(f"**Make / Pabrikan:** {get_v_tag(['make', 'manufacturer', 'brand']) }")
-            st.write(f"**Model Perangkat:** {get_v_tag(['model', 'device_model']) }")
-            st.write(f"**Software / iOS:** {get_v_tag(['software']) }")
-        with col_v2:
-            st.write(f"**Creation Date:** {get_v_tag(['creation_date', 'creation_time', 'date']) }")
-            st.write(f"**Encoder:** {get_v_tag(['encoder', 'handler_name']) }")
-            
-        with st.expander("📄 Lihat Seluruh Raw Metadata Hasil Suntikan"):
-            st.json(v_tags)
-            
-        st.markdown("#### 🛑 Keputusan Anda:")
-        col_btn1, col_btn2 = st.columns(2)
+        tgt_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+        tgt_file.write(uploaded_target.read())
+        tgt_file.close()
         
-        with col_btn1:
-            if os.path.exists(st.session_state.spoofed_file_path):
-                with open(st.session_state.spoofed_file_path, "rb") as f:
-                    st.download_button(
-                        label="✅ Setuju & Lanjut Unduh Video",
-                        data=f,
-                        file_name=f"video_verified_{chosen_execution_preset.replace(' ', '_')}.mp4",
-                        mime="video/mp4",
-                        type="primary"
-                    )
-        with col_btn2:
-            if st.button("❌ Batalkan / Ulangi Pengaturan"):
-                st.session_state.spoofed_file_path = None
-                st.session_state.verified_metadata = None
-                st.rerun()
-
-    if os.path.exists(tfile.name): 
-        os.unlink(tfile.name)
-        
+        if st.button("🚀 Mulai Proses Pembuatan Video Identik", type="primary"):
+            with st.spinner("Sedang memproses struktur video dan menyuntikkan metadata..."):
+                output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mov')
+                output_file.close()
+                
+                profile_data = st.session_state.preset_list[chosen_profile]
+                f_tags = profile_data.get("format_tags", {})
+                s_tags_list = profile_data.get("streams_tags", [])
+                
+                if "Identik Forensik" in render_mode:
+                    # Perintah Transcoding mendalam: Mengubah stream ke format Apple-like H.264 & AAC
+                    ffmpeg_cmd = [
+                        "ffmpeg", "-y", "-i", tgt_file.name,
+                        "-c:v", "libx264", "-profile:v", "high", "-level", "4.2",
+                        "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "slow",
+                        "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+use_metadata_tags+faststart",
+                        "-map_metadata", "0"
+                    ]
+                else:
+                    # Mode salin cepat (tanpa re-encode)
+                    ffmpeg_cmd = [
+                        "ffmpeg", "-y", "-i", tgt_file.name,
+                        "-movflags", "+use_metadata_tags",
+                        "-map_metadata", "0",
+                        "-codec", "copy"
+                    ]
+                
+                # Masukkan tag format secara dinamis
+                for k, v in f_tags.items():
+                    ffmpeg_cmd.extend(["-metadata", f"{k}={v}"])
+                    
+                # Masukkan tag stream secara dinamis
+                for idx, st_tags in enumerate(s_tags_list):
+                    for sk, sv in st_tags.items():
+                        ffmpeg_cmd.extend([f"-metadata:s:{idx}", f"{sk}={sv}"])
+                
+                # Pastikan kontainer keluaran berformat .mov khas Apple jika mode forensik dipilih
+                ffmpeg_cmd.append(output_file.name)
+                
+                try:
+                    subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    st.success("Pembuatan video identik berhasil!")
+                    
+                    # Verifikasi hasil akhir
+                    cmd_verify = [
+                        "ffprobe", "-v", "quiet", "-print_format", "json",
+                        "-show_format", "-show_streams", output_file.name
+                    ]
+                    v_res = subprocess.run(cmd_verify, capture_output=True, text=True, check=True)
+                    v_data = json.loads(v_res.stdout)
+                    
+                    st.markdown("### 🔍 Verifikasi Metadata Final")
+                    v_format_tags = v_data.get("format", {}).get("tags", {})
+                    st.json(v_format_tags)
+                    
+                    with open(output_file.name, "rb") as f:
+                        st.download_button(
+                            label="✅ Unduh Video Hasil Re-Encode Identik (.mov)",
+                            data=f,
+                            file_name="video_forensic_identical.mov",
+                            mime="video/quicktime",
+                            type="primary"
+                        )
+                        
+                except Exception as e:
+                    st.error(f"Gagal menjalankan FFmpeg: {e}")
+                    
+        if os.path.exists(tgt_file.name):
+            os.unlink(tgt_file.name)
