@@ -146,7 +146,7 @@ if uploaded_file is not None:
             
             st.markdown("---")
             st.markdown("#### 📋 Salin & Simpan Metadata Ini")
-            save_name_input = st.text_input("Beri Nama Preset List", value=f"Preset_{extracted_model if extracted_model != 'N/A' else 'Custom'}ikk", key="save_preset_input")
+            save_name_input = st.text_input("Beri Nama Preset List", value=f"Preset_{extracted_model if extracted_model != 'N/A' else 'Custom'}", key="save_preset_input")
             
             if st.button("📥 Simpan ke List Preset Sekarang", type="secondary"):
                 st.session_state.preset_list[save_name_input] = {
@@ -180,19 +180,43 @@ if uploaded_file is not None:
 
     st.markdown("---")
     
-    # --- BAGIAN EKSEKUSI SUNTIK DENGAN PILIHAN PRESET & VERIFIKASI ULANG ---
+    # --- BAGIAN EKSEKUSI SUNTIK DENGAN PILIHAN PRESET DEFAULT & OPSI HAPUS ---
     st.subheader("🚀 Eksekusi & Analisis Ulang Metadata (Paste & Verify Engine)")
-    st.write("Pilih preset target, jalankan suntikan, lalu verifikasi detail metadata terbarunya sebelum diunduh.")
+    st.write("Pilih preset target, jalankan suntikan, lalu verifikasi detail metadata terbarunya.")
     
     current_preset_names = list(st.session_state.preset_list.keys())
-    chosen_execution_preset = st.selectbox("🎯 Pilih Preset Target untuk Disuntikkan", current_preset_names, key="exec_preset_choice")
     
+    # Otomatis jadikan iPhone 11 sebagai default index pertama jika ada di list
+    default_index = 0
+    for idx, p_name in enumerate(current_preset_names):
+        if "iPhone 11" in p_name:
+            default_index = idx
+            break
+            
+    chosen_execution_preset = st.selectbox(
+        "🎯 Pilih Preset Target untuk Disuntikkan (Default: iPhone 11)", 
+        current_preset_names, 
+        index=default_index, 
+        key="exec_preset_choice"
+    )
+    
+    # Tombol instan untuk menghapus preset yang sedang dipilih dari list
+    col_del_p1, col_del_p2 = st.columns([2, 5])
+    with col_del_p1:
+        if len(current_preset_names) > 1:
+            if st.button("🗑️ Hapus Preset Ini dari List"):
+                del st.session_state.preset_list[chosen_execution_preset]
+                save_presets(st.session_state.preset_list)
+                st.warning(f"Preset '{chosen_execution_preset}' berhasil dihapus!")
+                st.rerun()
+        else:
+            st.caption("Minimal harus ada 1 preset tersimpan.")
+            
     selected_data = st.session_state.preset_list[chosen_execution_preset]
     
     with st.expander(f"👁️ Lihat Detail Data yang Akan Disuntikkan dari Preset: **{chosen_execution_preset}**"):
         st.json(selected_data)
     
-    # Simpan status di session_state agar hasil verifikasi tidak hilang saat interaksi lain
     if "spoofed_file_path" not in st.session_state:
         st.session_state.spoofed_file_path = None
     if "verified_metadata" not in st.session_state:
@@ -243,7 +267,6 @@ if uploaded_file is not None:
         st.markdown("### 🔍 Hasil Verifikasi Metadata Terbaru (Setelah Disuntik)")
         st.info("Silakan periksa detail di bawah ini. Pastikan pengaturan sudah sesuai sebelum Anda memutuskan untuk mengunduhnya.")
         
-        # Tampilkan ringkasan poin penting hasil verifikasi
         v_tags = st.session_state.verified_metadata
         def get_v_tag(keys):
             for k in keys:
@@ -285,3 +308,4 @@ if uploaded_file is not None:
 
     if os.path.exists(tfile.name): 
         os.unlink(tfile.name)
+        
